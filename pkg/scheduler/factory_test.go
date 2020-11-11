@@ -19,12 +19,11 @@ package scheduler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -39,7 +38,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -110,13 +108,6 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
-					Name: defaultpreemption.Name,
-					Args: &schedulerapi.DefaultPreemptionArgs{
-						MinCandidateNodesPercentage: 10,
-						MinCandidateNodesAbsolute:   100,
-					},
-				},
-				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
 						HardPodAffinityWeight: 1,
@@ -180,12 +171,11 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "InterPodAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
+				PostFilter: &schedulerapi.PluginSet{},
 				PreScore: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
-						{Name: "NodeAffinity"},
 						{Name: "TaintToleration"},
 					},
 				},
@@ -242,13 +232,6 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
-					Name: defaultpreemption.Name,
-					Args: &schedulerapi.DefaultPreemptionArgs{
-						MinCandidateNodesPercentage: 10,
-						MinCandidateNodesAbsolute:   100,
-					},
-				},
-				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
 						HardPodAffinityWeight: 1,
@@ -296,13 +279,8 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "ServiceAffinity"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: "InterPodAffinity"},
-						{Name: "NodeAffinity"},
-					},
-				},
+				PostFilter: &schedulerapi.PluginSet{},
+				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
@@ -335,13 +313,6 @@ func TestCreateFromConfig(t *testing.T) {
 			}`),
 			wantPluginConfig: []schedulerapi.PluginConfig{
 				{
-					Name: defaultpreemption.Name,
-					Args: &schedulerapi.DefaultPreemptionArgs{
-						MinCandidateNodesPercentage: 10,
-						MinCandidateNodesAbsolute:   100,
-					},
-				},
-				{
 					Name: interpodaffinity.Name,
 					Args: &schedulerapi.InterPodAffinityArgs{
 						HardPodAffinityWeight: 10,
@@ -366,12 +337,8 @@ func TestCreateFromConfig(t *testing.T) {
 						{Name: "TaintToleration"},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultPreemption"}}},
-				PreScore: &schedulerapi.PluginSet{
-					Enabled: []schedulerapi.Plugin{
-						{Name: "InterPodAffinity"},
-					},
-				},
+				PostFilter: &schedulerapi.PluginSet{},
+				PreScore:   &schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "InterPodAffinity"}}},
 				Score: &schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: "InterPodAffinity", Weight: 1},
@@ -561,35 +528,6 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 				t.Errorf("Unexpected nodes (-want, +got): %s", diff)
 			}
 		})
-	}
-}
-
-func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	nodeFoo := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	testPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}, Spec: v1.PodSpec{NodeName: "foo"}}
-
-	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: []v1.Node{nodeFoo}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	podInformer := informerFactory.Core().V1().Pods()
-	// Need to add testPod to the store.
-	podInformer.Informer().GetStore().Add(testPod)
-
-	queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
-
-	// Add node to schedulerCache no matter it's deleted in API server or not.
-	schedulerCache.AddNode(&nodeFoo)
-
-	testPodInfo := &framework.QueuedPodInfo{Pod: testPod}
-	errFunc := MakeDefaultErrorFunc(client, podInformer.Lister(), queue, schedulerCache)
-	errFunc(testPodInfo, fmt.Errorf("binding rejected: timeout"))
-
-	pod := getPodFromPriorityQueue(queue, testPod)
-	if pod != nil {
-		t.Fatalf("Unexpected pod: %v should not be in PriorityQueue when the NodeName of pod is not empty", pod.Name)
 	}
 }
 
