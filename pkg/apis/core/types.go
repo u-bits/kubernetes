@@ -445,13 +445,17 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	VolumeMode *PersistentVolumeMode
 	// This field can be used to specify either:
-	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot - Beta)
 	// * An existing PVC (PersistentVolumeClaim)
-	// * An existing custom resource that implements data population (Alpha)
-	// In order to use custom resource types that implement data population,
-	// the AnyVolumeDataSource feature gate must be enabled.
+	// * An existing custom resource/object that implements data population (Alpha)
+	// In order to use VolumeSnapshot object types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource or AnyVolumeDataSource)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
+	// If the specified data source is not supported, the volume will
+	// not be created and the failure will be reported as an event.
+	// In the future, we plan to support more data source types and the behavior
+	// of the provisioner may change.
 	// +optional
 	DataSource *TypedLocalObjectReference
 }
@@ -2819,7 +2823,8 @@ type PodSpec struct {
 	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
-	// More info: https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class/README.md
+	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string
 	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
@@ -3475,23 +3480,12 @@ const (
 	ServiceExternalTrafficPolicyTypeCluster ServiceExternalTrafficPolicyType = "Cluster"
 )
 
-// These are the valid conditions of a service.
-const (
-	// LoadBalancerPortsError represents the condition of the requested ports
-	// on the cloud load balancer instance.
-	LoadBalancerPortsError = "LoadBalancerPortsError"
-)
-
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct {
 	// LoadBalancer contains the current status of the load-balancer,
 	// if one is present.
 	// +optional
 	LoadBalancer LoadBalancerStatus
-
-	// Current service condition
-	// +optional
-	Conditions []metav1.Condition
 }
 
 // LoadBalancerStatus represents the status of a load-balancer
@@ -3514,11 +3508,6 @@ type LoadBalancerIngress struct {
 	// (typically AWS load-balancers)
 	// +optional
 	Hostname string
-
-	// Ports is a list of records of service ports
-	// If used, every port defined in the service should have an entry in it
-	// +optional
-	Ports []PortStatus
 }
 
 const (
@@ -3705,19 +3694,8 @@ type ServiceSpec struct {
 	// The special value "*" may be used to mean "any topology". This catch-all
 	// value, if used, only makes sense as the last value in the list.
 	// If this is not specified or empty, no topology constraints will be applied.
-	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-	// This field is deprecated and will be removed in a future version.
 	// +optional
 	TopologyKeys []string
-
-	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
-	// allocated for services with type LoadBalancer.  Default is "true". It may be
-	// set to "false" if the cluster load-balancer does not rely on NodePorts.
-	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
-	// and will be cleared if the type is changed to any other type.
-	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
-	// +optional
-	AllocateLoadBalancerNodePorts *bool
 }
 
 // ServicePort represents the port on which the service is exposed
@@ -3737,6 +3715,8 @@ type ServicePort struct {
 	// RFC-6335 and http://www.iana.org/assignments/service-names).
 	// Non-standard protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
+	// This is a beta field that is guarded by the ServiceAppProtocol feature
+	// gate and enabled by default.
 	// +optional
 	AppProtocol *string
 
@@ -3887,6 +3867,8 @@ type EndpointPort struct {
 	// RFC-6335 and http://www.iana.org/assignments/service-names).
 	// Non-standard protocols should use prefixed names such as
 	// mycompany.com/my-custom-protocol.
+	// This is a beta field that is guarded by the ServiceAppProtocol feature
+	// gate and enabled by default.
 	// +optional
 	AppProtocol *string
 }
@@ -4832,9 +4814,9 @@ type ResourceQuotaScope string
 
 // These are valid values for resource quota spec
 const (
-	// Match all pod objects where spec.activeDeadlineSeconds >=0
+	// Match all pod objects where spec.activeDeadlineSeconds
 	ResourceQuotaScopeTerminating ResourceQuotaScope = "Terminating"
-	// Match all pod objects where spec.activeDeadlineSeconds is nil
+	// Match all pod objects where !spec.activeDeadlineSeconds
 	ResourceQuotaScopeNotTerminating ResourceQuotaScope = "NotTerminating"
 	// Match all pod objects that have best effort quality of service
 	ResourceQuotaScopeBestEffort ResourceQuotaScope = "BestEffort"
@@ -5409,33 +5391,4 @@ type TopologySpreadConstraint struct {
 	// in their corresponding topology domain.
 	// +optional
 	LabelSelector *metav1.LabelSelector
-}
-
-// These are the built-in errors for PortStatus.
-const (
-	// MixedProtocolNotSupported error in PortStatus means that the cloud provider
-	// can't ensure the port on the load balancer because mixed values of protocols
-	// on the same LoadBalancer type of Service are not supported by the cloud provider.
-	MixedProtocolNotSupported = "MixedProtocolNotSupported"
-)
-
-// PortStatus represents the error condition of a service port
-type PortStatus struct {
-	// Port is the port number of the service port of which status is recorded here
-	Port int32
-	// Protocol is the protocol of the service port of which status is recorded here
-	Protocol Protocol
-	// Error is to record the problem with the service port
-	// The format of the error shall comply with the following rules:
-	// - built-in error values shall be specified in this file and those shall use
-	//   CamelCase names
-	// - cloud provider specific error values must have names that comply with the
-	//   format foo.example.com/CamelCase.
-	// ---
-	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
-	// +optional
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
-	// +kubebuilder:validation:MaxLength=316
-	Error *string
 }

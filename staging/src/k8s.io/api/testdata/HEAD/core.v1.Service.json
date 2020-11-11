@@ -82,34 +82,16 @@
     "ipFamilies": [
       "斬³;Ơ歿:狞夌碕ʂɭîcP$Iņɖ"
     ],
-    "ipFamilyPolicy": "9ȫŚ",
-    "allocateLoadBalancerNodePorts": true
+    "ipFamilyPolicy": "9ȫŚ"
   },
   "status": {
     "loadBalancer": {
       "ingress": [
         {
           "ip": "31",
-          "hostname": "32",
-          "ports": [
-            {
-              "port": -907310967,
-              "protocol": "喂ƈ斎AO6",
-              "error": "33"
-            }
-          ]
+          "hostname": "32"
         }
       ]
-    },
-    "conditions": [
-      {
-        "type": "34",
-        "status": "C",
-        "observedGeneration": -2492120148461555858,
-        "lastTransitionTime": "2392-12-09T15:37:55Z",
-        "reason": "35",
-        "message": "36"
-      }
-    ]
+    }
   }
 }
