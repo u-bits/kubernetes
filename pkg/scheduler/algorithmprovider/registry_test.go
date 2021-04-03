@@ -47,21 +47,22 @@ import (
 
 func TestClusterAutoscalerProvider(t *testing.T) {
 	wantConfig := &schedulerapi.Plugins{
-		QueueSort: &schedulerapi.PluginSet{
+		QueueSort: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: queuesort.Name},
 			},
 		},
-		PreFilter: &schedulerapi.PluginSet{
+		PreFilter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: noderesources.FitName},
 				{Name: nodeports.Name},
 				{Name: podtopologyspread.Name},
 				{Name: interpodaffinity.Name},
 				{Name: volumebinding.Name},
+				{Name: nodeaffinity.Name},
 			},
 		},
-		Filter: &schedulerapi.PluginSet{
+		Filter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: nodeunschedulable.Name},
 				{Name: nodename.Name},
@@ -80,12 +81,12 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: interpodaffinity.Name},
 			},
 		},
-		PostFilter: &schedulerapi.PluginSet{
+		PostFilter: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultpreemption.Name},
 			},
 		},
-		PreScore: &schedulerapi.PluginSet{
+		PreScore: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: interpodaffinity.Name},
 				{Name: podtopologyspread.Name},
@@ -93,7 +94,7 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: nodeaffinity.Name},
 			},
 		},
-		Score: &schedulerapi.PluginSet{
+		Score: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: noderesources.BalancedAllocationName, Weight: 1},
 				{Name: imagelocality.Name, Weight: 1},
@@ -105,17 +106,17 @@ func TestClusterAutoscalerProvider(t *testing.T) {
 				{Name: tainttoleration.Name, Weight: 1},
 			},
 		},
-		Reserve: &schedulerapi.PluginSet{
+		Reserve: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
 			},
 		},
-		PreBind: &schedulerapi.PluginSet{
+		PreBind: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: volumebinding.Name},
 			},
 		},
-		Bind: &schedulerapi.PluginSet{
+		Bind: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
 				{Name: defaultbinder.Name},
 			},
@@ -138,21 +139,22 @@ func TestApplyFeatureGates(t *testing.T) {
 		{
 			name: "Feature gates disabled",
 			wantConfig: &schedulerapi.Plugins{
-				QueueSort: &schedulerapi.PluginSet{
+				QueueSort: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: queuesort.Name},
 					},
 				},
-				PreFilter: &schedulerapi.PluginSet{
+				PreFilter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.FitName},
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 						{Name: volumebinding.Name},
+						{Name: nodeaffinity.Name},
 					},
 				},
-				Filter: &schedulerapi.PluginSet{
+				Filter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: nodeunschedulable.Name},
 						{Name: nodename.Name},
@@ -171,12 +173,12 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{
+				PostFilter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultpreemption.Name},
 					},
 				},
-				PreScore: &schedulerapi.PluginSet{
+				PreScore: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
@@ -184,7 +186,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: nodeaffinity.Name},
 					},
 				},
-				Score: &schedulerapi.PluginSet{
+				Score: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.BalancedAllocationName, Weight: 1},
 						{Name: imagelocality.Name, Weight: 1},
@@ -196,17 +198,17 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: tainttoleration.Name, Weight: 1},
 					},
 				},
-				Reserve: &schedulerapi.PluginSet{
+				Reserve: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
 					},
 				},
-				PreBind: &schedulerapi.PluginSet{
+				PreBind: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
 					},
 				},
-				Bind: &schedulerapi.PluginSet{
+				Bind: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
 					},
@@ -219,21 +221,22 @@ func TestApplyFeatureGates(t *testing.T) {
 				features.DefaultPodTopologySpread: false,
 			},
 			wantConfig: &schedulerapi.Plugins{
-				QueueSort: &schedulerapi.PluginSet{
+				QueueSort: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: queuesort.Name},
 					},
 				},
-				PreFilter: &schedulerapi.PluginSet{
+				PreFilter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.FitName},
 						{Name: nodeports.Name},
 						{Name: podtopologyspread.Name},
 						{Name: interpodaffinity.Name},
 						{Name: volumebinding.Name},
+						{Name: nodeaffinity.Name},
 					},
 				},
-				Filter: &schedulerapi.PluginSet{
+				Filter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: nodeunschedulable.Name},
 						{Name: nodename.Name},
@@ -252,12 +255,12 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: interpodaffinity.Name},
 					},
 				},
-				PostFilter: &schedulerapi.PluginSet{
+				PostFilter: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultpreemption.Name},
 					},
 				},
-				PreScore: &schedulerapi.PluginSet{
+				PreScore: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: interpodaffinity.Name},
 						{Name: podtopologyspread.Name},
@@ -266,7 +269,7 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: selectorspread.Name},
 					},
 				},
-				Score: &schedulerapi.PluginSet{
+				Score: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: noderesources.BalancedAllocationName, Weight: 1},
 						{Name: imagelocality.Name, Weight: 1},
@@ -279,17 +282,17 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: selectorspread.Name, Weight: 1},
 					},
 				},
-				Reserve: &schedulerapi.PluginSet{
+				Reserve: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
 					},
 				},
-				PreBind: &schedulerapi.PluginSet{
+				PreBind: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: volumebinding.Name},
 					},
 				},
-				Bind: &schedulerapi.PluginSet{
+				Bind: schedulerapi.PluginSet{
 					Enabled: []schedulerapi.Plugin{
 						{Name: defaultbinder.Name},
 					},

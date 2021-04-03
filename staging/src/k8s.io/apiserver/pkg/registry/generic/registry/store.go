@@ -19,7 +19,6 @@ package registry
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/klog/v2"
 )
@@ -73,7 +73,6 @@ type GenericStore interface {
 	GetCreateStrategy() rest.RESTCreateStrategy
 	GetUpdateStrategy() rest.RESTUpdateStrategy
 	GetDeleteStrategy() rest.RESTDeleteStrategy
-	GetExportStrategy() rest.RESTExportStrategy
 }
 
 // Store implements k8s.io/apiserver/pkg/registry/rest.StandardStorage. It's
@@ -199,13 +198,13 @@ type Store struct {
 	// deletionTimestamp, and deletionGracePeriodSeconds checks.
 	ShouldDeleteDuringUpdate func(ctx context.Context, key string, obj, existing runtime.Object) bool
 
-	// ExportStrategy implements resource-specific behavior during export,
-	// optional. Exported objects are not decorated.
-	ExportStrategy rest.RESTExportStrategy
-
 	// TableConvertor is an optional interface for transforming items or lists
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
+
+	// ResetFieldsStrategy provides the fields reset by the strategy that
+	// should not be modified by the user.
+	ResetFieldsStrategy rest.ResetFieldsStrategy
 
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
@@ -223,7 +222,6 @@ type Store struct {
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
-var _ rest.Exporter = &Store{}
 var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
 
@@ -310,11 +308,6 @@ func (e *Store) GetUpdateStrategy() rest.RESTUpdateStrategy {
 // GetDeleteStrategy implements GenericStore.
 func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 	return e.DeleteStrategy
-}
-
-// GetExportStrategy implements GenericStore.
-func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
-	return e.ExportStrategy
 }
 
 // List returns a list of items matching labels and field according to the
@@ -756,7 +749,9 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// An explicit policy was set at deletion time, that overrides everything
+	//lint:ignore SA1019 backwards compatibility
 	if options != nil && options.OrphanDependents != nil {
+		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents
 	}
 	if options != nil && options.PropagationPolicy != nil {
@@ -797,6 +792,7 @@ func shouldDeleteDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// If an explicit policy was set at deletion time, that overrides both
+	//lint:ignore SA1019 backwards compatibility
 	if options != nil && options.OrphanDependents != nil {
 		return false
 	}
@@ -1267,44 +1263,6 @@ func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) 
 	return ttl, err
 }
 
-// exportObjectMeta unsets the fields on the given object that should not be
-// present when the object is exported.
-func exportObjectMeta(accessor metav1.Object, exact bool) {
-	accessor.SetUID("")
-	if !exact {
-		accessor.SetNamespace("")
-	}
-	accessor.SetCreationTimestamp(metav1.Time{})
-	accessor.SetDeletionTimestamp(nil)
-	accessor.SetResourceVersion("")
-	accessor.SetSelfLink("")
-	if len(accessor.GetGenerateName()) > 0 && !exact {
-		accessor.SetName("")
-	}
-}
-
-// Export implements the rest.Exporter interface
-func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	if accessor, err := meta.Accessor(obj); err == nil {
-		exportObjectMeta(accessor, opts.Exact)
-	} else {
-		klog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
-	}
-
-	if e.ExportStrategy != nil {
-		if err = e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
-			return nil, err
-		}
-	} else {
-		e.CreateStrategy.PrepareForCreate(ctx, obj)
-	}
-	return obj, nil
-}
-
 // CompleteWithOptions updates the store with the provided options and
 // defaults common fields.
 func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
@@ -1490,6 +1448,14 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (e *Store) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	if e.ResetFieldsStrategy == nil {
+		return nil
+	}
+	return e.ResetFieldsStrategy.GetResetFields()
 }
 
 // validateIndexers will check the prefix of indexers.

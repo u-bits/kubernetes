@@ -218,11 +218,7 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, f.OpenAPIGetter())
 	o.FieldManager = GetApplyFieldManagerFlag(cmd, o.ServerSideApply)
 
 	if o.ForceConflicts && !o.ServerSideApply {
@@ -652,7 +648,7 @@ func (o *ApplyOptions) MarkNamespaceVisited(info *resource.Info) {
 	}
 }
 
-// MarkNamespaceVisited keeps track of UIDs of the applied
+// MarkObjectVisited keeps track of UIDs of the applied
 // objects. Used for pruning.
 func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 	metadata, err := meta.Accessor(info.Object)
@@ -663,7 +659,7 @@ func (o *ApplyOptions) MarkObjectVisited(info *resource.Info) error {
 	return nil
 }
 
-// PrintAndPrune returns a function which meets the PostProcessorFn
+// PrintAndPrunePostProcessor returns a function which meets the PostProcessorFn
 // function signature. This returned function prints all the
 // objects as a list (if configured for that), and prunes the
 // objects not applied. The returned function is the standard

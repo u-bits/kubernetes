@@ -19,9 +19,11 @@ package testsuites
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -139,23 +141,63 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			sc = volumeResource.Sc
 			claimSize = pvc.Spec.Resources.Requests.Storage().String()
 
-			ginkgo.By("starting a pod to use the claim")
+			ginkgo.By("[init] starting a pod to use the claim")
 			originalMntTestData = fmt.Sprintf("hello from %s namespace", pvc.GetNamespace())
 			command := fmt.Sprintf("echo '%s' > %s", originalMntTestData, datapath)
 
-			RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
+			pod := RunInPodWithVolume(cs, f.Timeouts, pvc.Namespace, pvc.Name, "pvc-snapshottable-tester", command, config.ClientNodeSelection)
 
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, f.Timeouts.ClaimProvision)
 			framework.ExpectNoError(err)
-			ginkgo.By("checking the claim")
+
 			// Get new copy of the claim
+			ginkgo.By("[init] checking the claim")
 			pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(context.TODO(), pvc.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
 			// Get the bound PV
-			ginkgo.By("checking the PV")
-			_, err = cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
+			ginkgo.By("[init] checking the PV")
+			pv, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvc.Spec.VolumeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
+
+			// At this point we know that:
+			// - a pod was created with a PV that's supposed to have data
+			//
+			// However there's a caching issue that @jinxu97 explained and it's related with the pod & volume
+			// lifecycle in windows, to understand it we first analyze what the volumemanager does:
+			// - when a pod is delete the volumemanager will try to cleanup the volume mounts
+			//   - NodeUnpublishVolume: unbinds the bind mount from the container
+			//     - Linux: the data is flushed to disk
+			//     - Windows: we delete a symlink, data's not flushed yet to disk
+			//   - NodeUnstageVolume: unmount the global mount
+			//     - Linux: disk is detached
+			//     - Windows: data is flushed to disk and the disk is detached
+			//
+			// Pod deletion might not guarantee a data flush to disk, however NodeUnstageVolume adds the logic
+			// to flush the data to disk (see #81690 for details).
+			//
+			// In the following code by checking if the PV is not in the node.Status.VolumesInUse field we
+			// ensure that the volume is not used by the node anymore (an indicator that NodeUnstageVolume has
+			// already finished)
+			if framework.NodeOSDistroIs("windows") {
+				nodeName := pod.Spec.NodeName
+				gomega.Expect(nodeName).NotTo(gomega.BeEmpty(), "pod.Spec.NodeName must not be empty")
+
+				ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, pv.Name))
+				success := storageutils.WaitUntil(framework.Poll, f.Timeouts.PVDelete, func() bool {
+					node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+					volumesInUse := node.Status.VolumesInUse
+					framework.Logf("current volumes in use: %+v", volumesInUse)
+					for i := 0; i < len(volumesInUse); i++ {
+						if strings.HasSuffix(string(volumesInUse[i]), pv.Name) {
+							return false
+						}
+					}
+					return true
+				})
+				framework.ExpectEqual(success, true)
+			}
 		}
 
 		cleanup := func() {
@@ -192,14 +234,15 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				cleanupSteps = append(cleanupSteps, func() {
 					framework.ExpectNoError(sr.CleanupResource(f.Timeouts))
 				})
-				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts)
+				parameters := map[string]string{}
+				sr = storageframework.CreateSnapshotResource(sDriver, config, pattern, pvc.GetName(), pvc.GetNamespace(), f.Timeouts, parameters)
 				vs = sr.Vs
 				vscontent = sr.Vscontent
 				vsc = sr.Vsclass
 			})
 			ginkgo.It("should check snapshot fields, check restore correctly works after modifying source data, check deletion", func() {
-				ginkgo.By("checking the snapshot")
 				// Get new copy of the snapshot
+				ginkgo.By("checking the snapshot")
 				vs, err = dc.Resource(storageutils.SnapshotGVR).Namespace(vs.GetNamespace()).Get(context.TODO(), vs.GetName(), metav1.GetOptions{})
 				framework.ExpectNoError(err)
 
@@ -268,8 +311,17 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				framework.ExpectNoError(err)
 
 				ginkgo.By("should delete the VolumeSnapshotContent according to its deletion policy")
-				err = storageutils.DeleteAndWaitSnapshot(dc, vs.GetNamespace(), vs.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
+
+				// Delete both Snapshot and PVC at the same time because different storage systems
+				// have different ordering of deletion. Some may require delete PVC first before
+				// Snapshot deletion and some are opposite.
+				err = storageutils.DeleteSnapshotWithoutWaiting(dc, vs.GetNamespace(), vs.GetName())
 				framework.ExpectNoError(err)
+				err = cs.CoreV1().PersistentVolumeClaims(restoredPVC.Namespace).Delete(context.TODO(), restoredPVC.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+
+				// Wait for the Snapshot to be actually deleted from API server
+				err = storageutils.WaitForNamespacedGVRDeletion(dc, storageutils.SnapshotGVR, vs.GetNamespace(), vs.GetNamespace(), framework.Poll, f.Timeouts.SnapshotDelete)
 
 				switch pattern.SnapshotDeletionPolicy {
 				case storageframework.DeleteSnapshot:

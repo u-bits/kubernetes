@@ -160,16 +160,6 @@ type Pod struct {
 	Containers []*Container
 }
 
-// FindContainer returns the container matching port and protocol; otherwise, an error
-func (p *Pod) FindContainer(port int32, protocol v1.Protocol) (*Container, error) {
-	for _, cont := range p.Containers {
-		if cont.Port == port && cont.Protocol == protocol {
-			return cont, nil
-		}
-	}
-	return nil, errors.Errorf("unable to find container in pod %s/%s, port %d, protocol %s", p.Namespace, p.Name, port, protocol)
-}
-
 // PodString returns a corresponding pod string
 func (p *Pod) PodString() PodString {
 	return NewPodString(p.Namespace, p.Name)
@@ -270,6 +260,7 @@ func (c *Container) Spec() v1.Container {
 	var (
 		// agnHostImage is the image URI of AgnHost
 		agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
+		env          = []v1.EnvVar{}
 		cmd          []string
 	)
 
@@ -279,15 +270,21 @@ func (c *Container) Spec() v1.Container {
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "serve-hostname", "--udp", "--http=false", "--port", fmt.Sprintf("%d", c.Port)}
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "netexec", "--sctp-port", fmt.Sprintf("%d", c.Port)}
+		env = append(env, v1.EnvVar{
+			Name:  fmt.Sprintf("SERVE_SCTP_PORT_%d", c.Port),
+			Value: "foo",
+		})
+		cmd = []string{"/agnhost", "porter"}
 	default:
 		framework.Failf("invalid protocol %v", c.Protocol)
 	}
+
 	return v1.Container{
 		Name:            c.Name(),
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Image:           agnHostImage,
 		Command:         cmd,
+		Env:             env,
 		SecurityContext: &v1.SecurityContext{},
 		Ports: []v1.ContainerPort{
 			{

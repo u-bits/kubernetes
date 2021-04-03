@@ -1243,7 +1243,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
@@ -1299,7 +1299,7 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FeatureTag == "[sig-windows]" {
+	if pattern.FeatureTag == "[Feature:Windows]" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	}
 }
@@ -1416,6 +1416,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
+				"ntfs",
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
@@ -1682,7 +1683,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
@@ -1774,7 +1775,7 @@ func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}

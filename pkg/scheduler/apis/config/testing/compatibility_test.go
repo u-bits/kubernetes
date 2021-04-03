@@ -66,6 +66,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"PreFilterPlugin": {
 					{Name: "NodeResourcesFit"},
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -123,6 +124,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
@@ -177,6 +179,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
@@ -236,6 +239,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 				},
@@ -304,6 +308,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
@@ -380,6 +385,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
@@ -467,6 +473,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
@@ -565,6 +572,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "InterPodAffinity"},
@@ -664,6 +672,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -770,6 +779,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -888,6 +898,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -1008,6 +1019,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -1128,6 +1140,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -1253,6 +1266,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"QueueSortPlugin": {{Name: "PrioritySort"}},
 				"PreFilterPlugin": {
 					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "NodeResourcesFit"},
 					{Name: "ServiceAffinity"},
 					{Name: "VolumeBinding"},
@@ -1383,6 +1397,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 			{Name: "VolumeBinding"},
+			{Name: "NodeAffinity"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1451,6 +1466,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "VolumeBinding"},
+					{Name: "NodeAffinity"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1538,6 +1554,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 			{Name: "PodTopologySpread"},
 			{Name: "InterPodAffinity"},
 			{Name: "VolumeBinding"},
+			{Name: "NodeAffinity"},
 		},
 		"FilterPlugin": {
 			{Name: "NodeUnschedulable"},
@@ -1636,13 +1653,13 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		{
 			name: "in-tree plugins with customized plugin config",
 			plugins: config.Plugins{
-				Filter: &config.PluginSet{
+				Filter: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "NodeLabel"},
 						{Name: "ServiceAffinity"},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "RequestedToCapacityRatio"},
 					},
@@ -1658,6 +1675,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 					{Name: "PodTopologySpread"},
 					{Name: "InterPodAffinity"},
 					{Name: "VolumeBinding"},
+					{Name: "NodeAffinity"},
 				},
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1855,16 +1873,17 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		{
 			name: "disable some default plugins",
 			plugins: config.Plugins{
-				PreFilter: &config.PluginSet{
+				PreFilter: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "NodeResourcesFit"},
+						{Name: "NodeAffinity"},
 						{Name: "NodePorts"},
 						{Name: "InterPodAffinity"},
 						{Name: "PodTopologySpread"},
 						{Name: "VolumeBinding"},
 					},
 				},
-				Filter: &config.PluginSet{
+				Filter: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "NodeUnschedulable"},
 						{Name: "NodeResourcesFit"},
@@ -1883,12 +1902,12 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "PodTopologySpread"},
 					},
 				},
-				PostFilter: &config.PluginSet{
+				PostFilter: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "DefaultPreemption"},
 					},
 				},
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "InterPodAffinity"},
 						{Name: "SelectorSpread"},
@@ -1896,7 +1915,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "PodTopologySpread"},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "NodeResourcesBalancedAllocation"},
 						{Name: "ImageLocality"},
@@ -1909,17 +1928,17 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "PodTopologySpread"},
 					},
 				},
-				PreBind: &config.PluginSet{
+				PreBind: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "VolumeBinding"},
 					},
 				},
-				PostBind: &config.PluginSet{
+				PostBind: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "VolumeBinding"},
 					},
 				},
-				Reserve: &config.PluginSet{
+				Reserve: config.PluginSet{
 					Disabled: []config.Plugin{
 						{Name: "VolumeBinding"},
 					},
@@ -1935,7 +1954,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 		{
 			name: "reverse default plugins order with changing score weight",
 			plugins: config.Plugins{
-				QueueSort: &config.PluginSet{
+				QueueSort: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "PrioritySort"},
 					},
@@ -1943,7 +1962,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "*"},
 					},
 				},
-				PreFilter: &config.PluginSet{
+				PreFilter: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "InterPodAffinity"},
 						{Name: "NodePorts"},
@@ -1953,7 +1972,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "*"},
 					},
 				},
-				Filter: &config.PluginSet{
+				Filter: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "InterPodAffinity"},
 						{Name: "VolumeZone"},
@@ -1974,7 +1993,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "*"},
 					},
 				},
-				PreScore: &config.PluginSet{
+				PreScore: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "PodTopologySpread"},
 						{Name: "TaintToleration"},
@@ -1985,7 +2004,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "*"},
 					},
 				},
-				Score: &config.PluginSet{
+				Score: config.PluginSet{
 					Enabled: []config.Plugin{
 						{Name: "PodTopologySpread", Weight: 24},
 						{Name: "TaintToleration", Weight: 24},
@@ -2001,7 +2020,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 						{Name: "*"},
 					},
 				},
-				Bind: &config.PluginSet{
+				Bind: config.PluginSet{
 					Enabled:  []config.Plugin{{Name: "DefaultBinder"}},
 					Disabled: []config.Plugin{{Name: "*"}},
 				},

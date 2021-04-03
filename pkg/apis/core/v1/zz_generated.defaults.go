@@ -158,6 +158,7 @@ func SetObjectDefaults_LimitRangeList(in *v1.LimitRangeList) {
 }
 
 func SetObjectDefaults_Namespace(in *v1.Namespace) {
+	SetDefaults_Namespace(in)
 	SetDefaults_NamespaceStatus(&in.Status)
 }
 
@@ -913,6 +914,12 @@ func SetObjectDefaults_SecretList(in *v1.SecretList) {
 
 func SetObjectDefaults_Service(in *v1.Service) {
 	SetDefaults_Service(in)
+	for i := range in.Spec.Ports {
+		a := &in.Spec.Ports[i]
+		if a.Protocol == "" {
+			a.Protocol = "TCP"
+		}
+	}
 }
 
 func SetObjectDefaults_ServiceList(in *v1.ServiceList) {

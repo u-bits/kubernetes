@@ -116,7 +116,7 @@ func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, container
 	case v1.ProtocolTCP:
 		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"nc", "-v", "-z", "-w", "1", "-u", addrTo, fmt.Sprintf("%d", toPort)}
+		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=udp"}
 	default:
 		framework.Failf("protocol %s not supported", protocol)
 	}
@@ -259,7 +259,7 @@ func (k *kubeManager) waitForHTTPServers(model *Model) error {
 		for _, protocol := range model.Protocols {
 			fromPort := 81
 			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
-			testCases[desc] = &TestCase{FromPort: fromPort, ToPort: int(port), Protocol: protocol}
+			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}
 		}
 	}
 	notReady := map[string]bool{}

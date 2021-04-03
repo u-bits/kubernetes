@@ -608,7 +608,7 @@ function append_or_replace_prefixed_line {
   local -r prefix="${2:-}"
   local -r suffix="${3:-}"
   local -r dirname=$(dirname "${file}")
-  local -r tmpfile=$(mktemp -t filtered.XXXX --tmpdir="${dirname}")
+  local -r tmpfile=$(mktemp "${dirname}/filtered.XXXX")
 
   touch "${file}"
   awk -v pfx="${prefix}" 'substr($0,1,length(pfx)) != pfx { print }' "${file}" > "${tmpfile}"
@@ -1453,6 +1453,7 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+
 function docker-installed {
     if systemctl cat docker.service &> /dev/null ; then
         return 0
@@ -1461,40 +1462,97 @@ function docker-installed {
     fi
 }
 
+# util function to add a docker option to daemon.json file only if the daemon.json file is present.
+# accepts only one argument (docker options)
+function addockeropt {
+	DOCKER_OPTS_FILE=/etc/docker/daemon.json
+	if [ "$#" -lt 1 ]; then
+	echo "No arguments are passed while adding docker options. Expect one argument"
+	exit 1
+	elif [ "$#" -gt 1 ]; then
+	echo "Only one argument is accepted"
+	exit 1
+	fi
+	# appends the given input to the docker opts file i.e. /etc/docker/daemon.json file
+	if [ -f "$DOCKER_OPTS_FILE" ]; then
+	cat >> "${DOCKER_OPTS_FILE}" <<EOF
+  $1
+EOF
+	fi
+}
+
+function set_docker_options_non_ubuntu() {
+  # set docker options mtu and storage driver for non-ubuntu
+  # as it is default for ubuntu
+   if [[ -n "$(command -v lsb_release)" && $(lsb_release -si) == "Ubuntu" ]]; then
+      echo "Not adding docker options on ubuntu, as these are default on ubuntu. Bailing out..."
+      return
+   fi
+
+   addockeropt "\"mtu\": 1460,"
+   addockeropt "\"storage-driver\": \"overlay2\","
+
+   echo "setting live restore"
+   # Disable live-restore if the environment variable is set.
+   if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
+      addockeropt "\"live-restore\": \"false\","
+   fi
+}
+
 function assemble-docker-flags {
-  echo "Assemble docker command line flags"
-  local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
-  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
-    docker_opts+=" --log-level=debug"
-  else
-    docker_opts+=" --log-level=warn"
-  fi
-  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
-    docker_opts+=" --bip=169.254.123.1/24"
-  else
-    docker_opts+=" --bridge=cbr0"
+  echo "Assemble docker options"
+
+    # log the contents of the /etc/docker/daemon.json if already exists
+  if [ -f /etc/docker/daemon.json ]; then
+    echo "Contents of the old docker config"
+    cat /etc/docker/daemon.json
   fi
 
+  cat <<EOF >/etc/docker/daemon.json
+{
+EOF
+
+addockeropt "\"pidfile\": \"/var/run/docker.pid\",
+  \"iptables\": false,
+  \"ip-masq\": false,"
+
+  echo "setting log-level"
+  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
+    addockeropt "\"log-level\": \"debug\","
+  else
+    addockeropt "\"log-level\": \"warn\","
+  fi
+
+  echo "setting network bridge"
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
+    addockeropt "\"bip\": \"169.254.123.1/24\","
+  else
+    addockeropt "\"bridge\": \"cbr0\","
+  fi
+
+  echo "setting registry mirror"
+  # TODO (vteratipally)  move the registry-mirror completely to /etc/docker/daemon.json
+  local docker_opts=""
   # Decide whether to enable a docker registry mirror. This is taken from
   # the "kube-env" metadata value.
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
-    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
-    docker_opts+=" --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
+      docker_opts+="--registry-mirror=${DOCKER_REGISTRY_MIRROR_URL} "
   fi
 
+  set_docker_options_non_ubuntu
+
+  echo "setting docker logging options"
   # Configure docker logging
-  docker_opts+=" --log-driver=${DOCKER_LOG_DRIVER:-json-file}"
-  docker_opts+=" --log-opt=max-size=${DOCKER_LOG_MAX_SIZE:-10m}"
-  docker_opts+=" --log-opt=max-file=${DOCKER_LOG_MAX_FILE:-5}"
-
-  # Disable live-restore if the environment variable is set.
-
-  if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-    docker_opts+=" --live-restore=false"
-  fi
-
-  echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  addockeropt "\"log-driver\": \"${DOCKER_LOG_DRIVER:-json-file}\","
+  addockeropt "\"log-opts\": {
+      \"max-size\": \"${DOCKER_LOG_MAX_SIZE:-10m}\",
+      \"max-file\": \"${DOCKER_LOG_MAX_FILE:-5}\"
+    }"
+  cat <<EOF >>/etc/docker/daemon.json
+}
+EOF
+  echo "DOCKER_OPTS=\"${docker_opts}${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
 
   # Ensure TasksMax is sufficient for docker.
   # (https://github.com/kubernetes/kubernetes/issues/51977)
@@ -1627,6 +1685,7 @@ function prepare-log-file {
 
 # Prepares parameters for kube-proxy manifest.
 # $1 source path of kube-proxy manifest.
+# Assumptions: HOST_PLATFORM and HOST_ARCH are specified by calling detect_host_info.
 function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
@@ -1676,6 +1735,8 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" "${src_file}"
+  # TODO(#99245): Use multi-arch image and get rid of this.
+  sed -i -e "s@{{pillar\['host_arch'\]}}@${HOST_ARCH}@g" "${src_file}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
@@ -1982,6 +2043,12 @@ function run-kube-controller-manager-as-non-root {
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if ! deploy-kube-controller-manager-via-kube-up; then
+      echo "kube-controller-manager is configured to not be deployed through kube-up."
+      return
+    fi
+  fi
   echo "Start kubernetes controller-manager"
   create-kubeconfig "kube-controller-manager" "${KUBE_CONTROLLER_MANAGER_TOKEN}"
   prepare-log-file /var/log/kube-controller-manager.log
@@ -1993,6 +2060,7 @@ function start-kube-controller-manager {
   params+=("--kubeconfig=${config_path}" "--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
   params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
   params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
+  params+=("--volume-host-allow-local-loopback=false")
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=("--enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}")
   fi
@@ -2090,9 +2158,11 @@ function start-kube-controller-manager {
 # Assumed vars (which are calculated in compute-master-manifest-variables)
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
-  if [[ "${KUBE_SCHEDULER_CRP:-}" == "true" ]]; then
-    echo "kube-scheduler is configured to be deployed through CRP."
-    return
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if ! deploy-kube-scheduler-via-kube-up; then
+      echo "kube-scheduler is configured to not be deployed through kube-up."
+      return
+    fi
   fi
   echo "Start kubernetes scheduler"
   create-kubeconfig "kube-scheduler" "${KUBE_SCHEDULER_TOKEN}"
@@ -2976,9 +3046,46 @@ EOF
   systemctl restart containerd
 }
 
+# This function detects the platform/arch of the machine where the script runs,
+# and sets the HOST_PLATFORM and HOST_ARCH environment variables accordingly.
+# Callers can specify HOST_PLATFORM_OVERRIDE and HOST_ARCH_OVERRIDE to skip the detection.
+# This function is adapted from the detect_client_info function in cluster/get-kube-binaries.sh
+# and kube::util::host_os, kube::util::host_arch functions in hack/lib/util.sh
+# This function should be synced with detect_host_info in ./configure.sh
+function detect_host_info() {
+  HOST_PLATFORM=${HOST_PLATFORM_OVERRIDE:-"$(uname -s)"}
+  case "${HOST_PLATFORM}" in
+    Linux|linux)
+      HOST_PLATFORM="linux"
+      ;;
+    *)
+      echo "Unknown, unsupported platform: ${HOST_PLATFORM}." >&2
+      echo "Supported platform(s): linux." >&2
+      echo "Bailing out." >&2
+      exit 2
+  esac
+
+  HOST_ARCH=${HOST_ARCH_OVERRIDE:-"$(uname -m)"}
+  case "${HOST_ARCH}" in
+    x86_64*|i?86_64*|amd64*)
+      HOST_ARCH="amd64"
+      ;;
+    aHOST_arch64*|aarch64*|arm64*)
+      HOST_ARCH="arm64"
+      ;;
+    *)
+      echo "Unknown, unsupported architecture (${HOST_ARCH})." >&2
+      echo "Supported architecture(s): amd64 and arm64." >&2
+      echo "Bailing out." >&2
+      exit 2
+      ;;
+  esac
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
+  detect_host_info
 
   readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
   readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
@@ -3142,7 +3249,6 @@ function main() {
   fi
   reset-motd
   prepare-mounter-rootfs
-  modprobe configs
   echo "Done for the configuration for kubernetes"
 }
 

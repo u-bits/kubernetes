@@ -552,13 +552,16 @@ export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 export KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP="${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-false}"
 
 # ETCD_PROGRESS_NOTIFY_INTERVAL defines the interval for etcd watch progress notify events.
-export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-10m}"
+export ETCD_PROGRESS_NOTIFY_INTERVAL="${ETCD_PROGRESS_NOTIFY_INTERVAL:-5s}"
 
 # Optional: Install Pigz on Windows.
 # Pigz is a multi-core optimized version of unzip.exe.
 # It improves container image pull performance since most time is spent
 # unzipping the image layers to disk.
 export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
+
+# Enable Windows DSR (Direct Server Return)
+export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
 
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. 
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
