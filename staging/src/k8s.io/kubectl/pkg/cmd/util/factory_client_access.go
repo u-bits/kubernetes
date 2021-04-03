@@ -19,7 +19,6 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,11 +38,13 @@ import (
 type factoryImpl struct {
 	clientGetter genericclioptions.RESTClientGetter
 
-	// Caches OpenAPI document and parsed resources
-	openAPIParser *openapi.CachedOpenAPIParser
-	openAPIGetter *openapi.CachedOpenAPIGetter
-	parser        sync.Once
-	getter        sync.Once
+	// openAPIGetter loads and caches openapi specs
+	openAPIGetter openAPIGetter
+}
+
+type openAPIGetter struct {
+	once   sync.Once
+	getter openapi.Getter
 }
 
 func NewFactory(clientGetter genericclioptions.RESTClientGetter) Factory {
